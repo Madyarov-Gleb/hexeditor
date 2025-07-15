@@ -21,7 +21,6 @@ public class App extends JFrame {
         setSize(800, 600);
         setLocationRelativeTo(null);
 
-        // Добавляем обработчик закрытия окна
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         addWindowListener(new WindowAdapter() {
             @Override
@@ -32,7 +31,6 @@ public class App extends JFrame {
     }
 
     private void confirmAndExit() {
-        // Проверяем, нужно ли сохранять изменения
         if (controller != null && controller.hasUnsavedChanges()) {
             int option = JOptionPane.showConfirmDialog(
                     this,
@@ -51,11 +49,10 @@ public class App extends JFrame {
                     return;
                 }
             } else if (option == JOptionPane.CANCEL_OPTION) {
-                return; // Отмена выхода
+                return;
             }
         }
 
-        // Закрываем ресурсы и выходим
         if (controller != null) {
             try {
                 controller.close();

@@ -33,7 +33,6 @@ public class ValueViewerDialog extends JDialog {
 
         ByteBuffer buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
 
-        // 1 byte values
         if (data.length >= 1) {
             byte b = buffer.get(0);
             panel.add(new JLabel("1 Byte (unsigned):"));
@@ -43,7 +42,6 @@ public class ValueViewerDialog extends JDialog {
             panel.add(new JLabel(String.valueOf(b)));
         }
 
-        // 2 byte values
         if (data.length >= 2) {
             short s = buffer.getShort(0);
             panel.add(new JLabel("2 Bytes (unsigned):"));
@@ -53,7 +51,6 @@ public class ValueViewerDialog extends JDialog {
             panel.add(new JLabel(String.valueOf(s)));
         }
 
-        // 4 byte values
         if (data.length >= 4) {
             int i = buffer.getInt(0);
             panel.add(new JLabel("4 Bytes (unsigned):"));
@@ -66,7 +63,6 @@ public class ValueViewerDialog extends JDialog {
             panel.add(new JLabel(String.valueOf(buffer.getFloat(0))));
         }
 
-        // 8 byte values
         if (data.length >= 8) {
             long l = buffer.getLong(0);
             panel.add(new JLabel("8 Bytes (signed):"));

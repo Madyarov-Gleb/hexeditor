@@ -45,21 +45,18 @@ public class ValueDisplayDialog extends JDialog {
     private void updateValues(byte[] data) {
         ByteBuffer buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
 
-        // 1 byte
         if (data.length >= 1) {
             byte b = buffer.get(0);
             byteValueLabel.setText(String.format("Byte: %d (0x%02X), unsigned: %d",
                     b, b & 0xFF, b & 0xFF));
         }
 
-        // 2 bytes
         if (data.length >= 2) {
             short s = buffer.getShort(0);
             shortValueLabel.setText(String.format("Short: %d (0x%04X), unsigned: %d",
                     s, s & 0xFFFF, s & 0xFFFF));
         }
 
-        // 4 bytes
         if (data.length >= 4) {
             int i = buffer.getInt(0);
             float f = buffer.getFloat(0);
@@ -68,7 +65,6 @@ public class ValueDisplayDialog extends JDialog {
             floatValueLabel.setText(String.format("Float: %f", f));
         }
 
-        // 8 bytes
         if (data.length >= 8) {
             long l = buffer.getLong(0);
             double d = buffer.getDouble(0);

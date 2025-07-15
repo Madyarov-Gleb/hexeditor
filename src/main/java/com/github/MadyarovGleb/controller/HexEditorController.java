@@ -3,6 +3,8 @@ package com.github.MadyarovGleb.controller;
 import com.github.MadyarovGleb.model.FileModel;
 import com.github.MadyarovGleb.model.SelectionModel;
 import javax.swing.*;
+import java.nio.ByteBuffer;
+import java.io.IOException;
 
 public class HexEditorController {
     private final FileModel fileModel;
@@ -33,5 +35,10 @@ public class HexEditorController {
         if (fileModel != null) {
             fileModel.close();
         }
+    }
+
+    public byte getByteAt(long position) throws IOException {
+        ByteBuffer buffer = fileModel.getBytes(position, 1);
+        return buffer.get();
     }
 }

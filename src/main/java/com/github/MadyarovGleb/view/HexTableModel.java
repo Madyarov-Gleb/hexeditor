@@ -25,7 +25,7 @@ public class HexTableModel extends AbstractTableModel {
 
     @Override
     public int getColumnCount() {
-        return bytesPerRow + 1; // +1 для колонки адресов
+        return bytesPerRow + 1;
     }
 
     @Override
@@ -48,7 +48,8 @@ public class HexTableModel extends AbstractTableModel {
         return col == 0 ? "Offset" : String.format("%02X", col - 1);
     }
 
-    public long positionForCell(int row, int col) {
-        return row * bytesPerRow + (col - 1);
+    public long positionForCell(int row, int column) {
+        if (column == 0) return -1; // Ячейка с адресом
+        return row * bytesPerRow + (column - 1);
     }
 }

@@ -51,20 +51,15 @@ public class ByteBufferFileModel implements FileModel {
             throw new IllegalArgumentException("Invalid offset");
         }
 
-        // Создаем временный файл для вставки
         long fileSize = getFileSize();
         long newSize = fileSize + data.length;
 
-        // Копируем данные после точки вставки
         ByteBuffer tail = getBytes(offset, (int)(fileSize - offset));
 
-        // Устанавливаем размер файла
         channel.truncate(offset);
 
-        // Записываем новые данные
         setBytes(offset, data);
 
-        // Записываем хвост
         if (tail.hasRemaining()) {
             channel.write(tail, offset + data.length);
         }
@@ -105,8 +100,6 @@ public class ByteBufferFileModel implements FileModel {
 
     @Override
     public void saveAs(String path) throws IOException {
-        // Реализация сохранения как нового файла
-        // (для простоты опущена, можно использовать Files.copy)
         throw new UnsupportedOperationException("saveAs not implemented");
     }
 
