@@ -14,4 +14,5 @@ public interface FileModel {
     void close() throws IOException;
     String getFilePath();
     boolean isModified();
+    void setByte(long position, byte value) throws IOException;
 }

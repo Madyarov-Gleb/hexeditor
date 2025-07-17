@@ -113,4 +113,17 @@ public class ByteBufferFileModel implements FileModel {
     public boolean isModified() {
         return modified;
     }
+
+    @Override
+    public void setByte(long position, byte value) throws IOException {
+        if (position < 0 || position >= getFileSize()) {
+            throw new IOException("Position out of bounds: " + position);
+        }
+
+        ByteBuffer buffer = ByteBuffer.allocate(1);
+        buffer.put(value);
+        buffer.flip();
+        channel.write(buffer, position);
+        modified = true;
+    }
 }

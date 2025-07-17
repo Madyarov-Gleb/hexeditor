@@ -124,6 +124,19 @@ public class HexEditorPanel extends JPanel {
         }
 
         hexTable.getColumnModel().getColumn(0).setPreferredWidth(80); // Offset column
+
+        hexTable.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                if (evt.getClickCount() == 2) {
+                    int row = hexTable.rowAtPoint(evt.getPoint());
+                    int col = hexTable.columnAtPoint(evt.getPoint());
+                    if (col >= 1) {
+                        editByteAt(row, col);
+                    }
+                }
+            }
+        });
+
     }
 
     private String formatSize(long size) {
@@ -227,5 +240,32 @@ public class HexEditorPanel extends JPanel {
     public void clearHighlight() {
         highlightedPositions.clear();
         hexTable.repaint();
+    }
+
+    private void editByteAt(int row, int col) {
+        long pos = tableModel.positionForCell(row, col);
+
+        try {
+            ByteBuffer buffer = fileModel.getBytes(pos, 1);
+            byte current = buffer.get();
+
+            String hexValue = JOptionPane.showInputDialog(this,
+                    String.format("Enter new value at 0x%08X (current: %02X)", pos, current),
+                    String.format("%02X", current));
+
+            if (hexValue == null) return;
+
+            hexValue = hexValue.trim();
+            if (hexValue.length() == 0 || hexValue.length() > 2) {
+                showError("Invalid hex value.");
+                return;
+            }
+
+            byte newByte = (byte) Integer.parseInt(hexValue, 16);
+            fileModel.setByte(pos, newByte);
+            hexTable.repaint();
+        } catch (IOException | NumberFormatException e) {
+            showError("Failed to edit byte: " + e.getMessage());
+        }
     }
 }
