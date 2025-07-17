@@ -49,7 +49,7 @@ public class HexTableModel extends AbstractTableModel {
     }
 
     public long positionForCell(int row, int column) {
-        if (column == 0) return -1; // Ячейка с адресом
+        if (column == 0) return -1;
         return row * bytesPerRow + (column - 1);
     }
 }

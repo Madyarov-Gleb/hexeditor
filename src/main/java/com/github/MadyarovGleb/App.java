@@ -117,6 +117,14 @@ public class App extends JFrame {
 
         menuBar.add(toolsMenu);
 
+        JMenu editMenu = new JMenu("Edit");
+
+        JMenuItem deleteItem = new JMenuItem("Delete Selected Bytes...");
+        deleteItem.addActionListener(e -> editorPanel.showDeleteDialog());
+
+        editMenu.add(deleteItem);
+        menuBar.add(editMenu);
+
         setJMenuBar(menuBar);
     }
 

@@ -1,6 +1,7 @@
 package com.github.MadyarovGleb.view;
 
 import com.github.MadyarovGleb.model.FileModel;
+import com.github.MadyarovGleb.model.SelectionModel;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -16,6 +17,7 @@ public class HexEditorPanel extends JPanel {
     private HexTableModel tableModel;
     private JLabel statusBar;
     private FileModel fileModel;
+    private SelectionModel selectionModel;
 
     private List<Long> searchResults;
     private int patternLength;
@@ -25,11 +27,12 @@ public class HexEditorPanel extends JPanel {
         initEmptyUI();
     }
 
-    public void setModel(FileModel fileModel, com.github.MadyarovGleb.model.SelectionModel selectionModel) {
+    public void setModel(FileModel fileModel, SelectionModel selectionModel) {
         this.fileModel = fileModel;
+        this.selectionModel = selectionModel;
         removeAll();
         try {
-            initHexView(fileModel, selectionModel);
+            initHexView(fileModel);
         } catch (IOException e) {
             showError("Error loading file: " + e.getMessage());
             initEmptyUI();
@@ -45,7 +48,7 @@ public class HexEditorPanel extends JPanel {
         add(statusBar, BorderLayout.SOUTH);
     }
 
-    private void initHexView(FileModel fileModel, com.github.MadyarovGleb.model.SelectionModel selectionModel) throws IOException {
+    private void initHexView(FileModel fileModel) throws IOException {
         setLayout(new BorderLayout());
 
         tableModel = new HexTableModel(fileModel);
@@ -62,13 +65,43 @@ public class HexEditorPanel extends JPanel {
         hexTable.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 updateByteValue();
+                updateSelectionModel();
             }
         });
         hexTable.getColumnModel().getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 updateByteValue();
+                updateSelectionModel();
             }
         });
+    }
+
+    private void updateSelectionModel() {
+        int[] selectedRows = hexTable.getSelectedRows();
+        int[] selectedCols = hexTable.getSelectedColumns();
+
+        if (selectedRows.length == 0 || selectedCols.length == 0) {
+            selectionModel.clearSelection();
+            return;
+        }
+
+        Long minPos = null;
+        Long maxPos = null;
+
+        for (int row : selectedRows) {
+            for (int col : selectedCols) {
+                if (col < 1) continue; // пропускаем колонку с оффсетом
+                long pos = tableModel.positionForCell(row, col);
+                if (minPos == null || pos < minPos) minPos = pos;
+                if (maxPos == null || pos > maxPos) maxPos = pos;
+            }
+        }
+
+        if (minPos != null && maxPos != null) {
+            selectionModel.setSelection(minPos, maxPos);
+        } else {
+            selectionModel.clearSelection();
+        }
     }
 
     private void updateByteValue() {
@@ -82,9 +115,7 @@ public class HexEditorPanel extends JPanel {
                 byte b = buffer.get();
 
                 String status = String.format("Byte: %d (signed) | %d (unsigned) | Hex: %02X",
-                        b,
-                        Byte.toUnsignedInt(b),
-                        b);
+                        b, Byte.toUnsignedInt(b), b);
                 statusBar.setText(status);
 
             } catch (IOException ex) {
@@ -136,45 +167,39 @@ public class HexEditorPanel extends JPanel {
                 }
             }
         });
-
-    }
-
-    private String formatSize(long size) {
-        if (size < 1024) return size + " bytes";
-        if (size < 1024 * 1024) return String.format("%.1f KB", size / 1024.0);
-        return String.format("%.1f MB", size / (1024.0 * 1024));
-    }
-
-    private void showError(String message) {
-        JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
     }
 
     private void setupContextMenu() {
-        JPopupMenu contextMenu = new JPopupMenu();
+        JPopupMenu menu = new JPopupMenu();
 
         JMenuItem byteItem = new JMenuItem("View as byte");
         byteItem.addActionListener(e -> showSelectedValue(1));
-        contextMenu.add(byteItem);
+        menu.add(byteItem);
 
         JMenuItem shortItem = new JMenuItem("View as 2 bytes (short)");
         shortItem.addActionListener(e -> showSelectedValue(2));
-        contextMenu.add(shortItem);
+        menu.add(shortItem);
 
         JMenuItem intItem = new JMenuItem("View as 4 bytes (int/float)");
         intItem.addActionListener(e -> showSelectedValue(4));
-        contextMenu.add(intItem);
+        menu.add(intItem);
 
         JMenuItem longItem = new JMenuItem("View as 8 bytes (long/double)");
         longItem.addActionListener(e -> showSelectedValue(8));
-        contextMenu.add(longItem);
+        menu.add(longItem);
 
-        hexTable.setComponentPopupMenu(contextMenu);
+        menu.addSeparator();
+
+        JMenuItem deleteItem = new JMenuItem("Delete selected bytes...");
+        deleteItem.addActionListener(e -> showDeleteDialog());
+        menu.add(deleteItem);
+
+        hexTable.setComponentPopupMenu(menu);
     }
 
     private void showValueDialog(long position, int byteCount) {
         try {
             byteCount = (int) Math.min(byteCount, fileModel.getFileSize() - position);
-
             ByteBuffer buffer = fileModel.getBytes(position, byteCount);
             byte[] data = new byte[buffer.remaining()];
             buffer.get(data);
@@ -183,10 +208,7 @@ public class HexEditorPanel extends JPanel {
             ValueInterpretationDialog dialog = new ValueInterpretationDialog(parentFrame, data, position);
             dialog.setVisible(true);
         } catch (IOException ex) {
-            JOptionPane.showMessageDialog(this,
-                    "Error reading data: " + ex.getMessage(),
-                    "Error",
-                    JOptionPane.ERROR_MESSAGE);
+            showError("Error reading data: " + ex.getMessage());
         }
     }
 
@@ -198,10 +220,7 @@ public class HexEditorPanel extends JPanel {
             long pos = tableModel.positionForCell(row, col);
             showValueDialog(pos, byteCount);
         } else {
-            JOptionPane.showMessageDialog(this,
-                    "Please select a cell first",
-                    "No Selection",
-                    JOptionPane.WARNING_MESSAGE);
+            showError("Please select a cell first");
         }
     }
 
@@ -267,5 +286,48 @@ public class HexEditorPanel extends JPanel {
         } catch (IOException | NumberFormatException e) {
             showError("Failed to edit byte: " + e.getMessage());
         }
+    }
+
+    public void showDeleteDialog() {
+        if (!selectionModel.hasSelection()) {
+            showError("No bytes selected.");
+            return;
+        }
+
+        long start = selectionModel.getSelectionStart();
+        long end = selectionModel.getSelectionEnd();
+        long length = end - start + 1;
+
+        Object[] options = { "Zero Fill", "Shift Left (Remove)" };
+        int choice = JOptionPane.showOptionDialog(this,
+                String.format("Delete %d byte(s):", length),
+                "Delete Bytes",
+                JOptionPane.DEFAULT_OPTION,
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                options,
+                options[0]);
+
+        if (choice == -1) return;
+
+        boolean fillWithZeros = (choice == 0);
+        try {
+            fileModel.deleteBytes(start, length, fillWithZeros);
+            selectionModel.clearSelection();
+            hexTable.clearSelection();
+            hexTable.repaint();
+        } catch (IOException e) {
+            showError("Delete failed: " + e.getMessage());
+        }
+    }
+
+    private String formatSize(long size) {
+        if (size < 1024) return size + " bytes";
+        if (size < 1024 * 1024) return String.format("%.1f KB", size / 1024.0);
+        return String.format("%.1f MB", size / (1024.0 * 1024));
+    }
+
+    private void showError(String message) {
+        JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
     }
 }
