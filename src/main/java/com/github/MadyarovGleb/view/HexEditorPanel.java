@@ -1,12 +1,15 @@
 package com.github.MadyarovGleb.view;
 
 import com.github.MadyarovGleb.model.FileModel;
-import com.github.MadyarovGleb.model.SelectionModel;
+
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
 import java.awt.*;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 public class HexEditorPanel extends JPanel {
     private JTable hexTable;
@@ -14,11 +17,15 @@ public class HexEditorPanel extends JPanel {
     private JLabel statusBar;
     private FileModel fileModel;
 
+    private List<Long> searchResults;
+    private int patternLength;
+    private final Set<Long> highlightedPositions = new HashSet<>();
+
     public HexEditorPanel() {
         initEmptyUI();
     }
 
-    public void setModel(FileModel fileModel, SelectionModel selectionModel) {
+    public void setModel(FileModel fileModel, com.github.MadyarovGleb.model.SelectionModel selectionModel) {
         this.fileModel = fileModel;
         removeAll();
         try {
@@ -38,7 +45,7 @@ public class HexEditorPanel extends JPanel {
         add(statusBar, BorderLayout.SOUTH);
     }
 
-    private void initHexView(FileModel fileModel, SelectionModel selectionModel) throws IOException {
+    private void initHexView(FileModel fileModel, com.github.MadyarovGleb.model.SelectionModel selectionModel) throws IOException {
         setLayout(new BorderLayout());
 
         tableModel = new HexTableModel(fileModel);
@@ -91,13 +98,32 @@ public class HexEditorPanel extends JPanel {
         hexTable.setCellSelectionEnabled(true);
         hexTable.setFont(new Font("Monospaced", Font.PLAIN, 14));
 
-        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
-        centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
-        for (int i = 0; i < hexTable.getColumnCount(); i++) {
-            hexTable.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
+        DefaultTableCellRenderer renderer = new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value,
+                                                           boolean isSelected, boolean hasFocus,
+                                                           int row, int column) {
+                Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+
+                long pos = tableModel.positionForCell(row, column);
+                if (highlightedPositions.contains(pos)) {
+                    c.setBackground(Color.YELLOW);
+                } else if (isSelected) {
+                    c.setBackground(table.getSelectionBackground());
+                } else {
+                    c.setBackground(Color.WHITE);
+                }
+                setHorizontalAlignment(SwingConstants.CENTER);
+                return c;
+            }
+        };
+
+        for (int i = 0; i < tableModel.getColumnCount(); i++) {
+            hexTable.getColumnModel().getColumn(i).setCellRenderer(renderer);
             hexTable.getColumnModel().getColumn(i).setPreferredWidth(30);
         }
-        hexTable.getColumnModel().getColumn(0).setPreferredWidth(80);
+
+        hexTable.getColumnModel().getColumn(0).setPreferredWidth(80); // Offset column
     }
 
     private String formatSize(long size) {
@@ -164,5 +190,42 @@ public class HexEditorPanel extends JPanel {
                     "No Selection",
                     JOptionPane.WARNING_MESSAGE);
         }
+    }
+
+    public void showSearchDialog() {
+        if (fileModel == null) return;
+
+        SearchDialog dialog = new SearchDialog((Frame) SwingUtilities.getWindowAncestor(this));
+        dialog.setVisible(true);
+
+        if (!dialog.isConfirmed()) return;
+
+        try {
+            byte[] pattern = dialog.getBytePattern();
+            boolean[] mask = dialog.getMask();
+            searchResults = BytePatternMatcher.search(fileModel, pattern, mask);
+            highlightedPositions.clear();
+
+            for (long pos : searchResults) {
+                for (int i = 0; i < pattern.length; i++) {
+                    highlightedPositions.add(pos + i);
+                }
+            }
+
+            if (searchResults.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "No matches found.");
+            } else {
+                patternLength = pattern.length;
+                hexTable.repaint();
+                JOptionPane.showMessageDialog(this, "Found " + searchResults.size() + " match(es).");
+            }
+        } catch (Exception ex) {
+            showError("Search error: " + ex.getMessage());
+        }
+    }
+
+    public void clearHighlight() {
+        highlightedPositions.clear();
+        hexTable.repaint();
     }
 }

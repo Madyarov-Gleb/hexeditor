@@ -101,6 +101,22 @@ public class App extends JFrame {
 
         menuBar.add(viewMenu);
 
+        JMenu toolsMenu = new JMenu("Tools");
+
+        toolsMenu.add(new JMenuItem(new AbstractAction("Search...") {
+            public void actionPerformed(ActionEvent e) {
+                editorPanel.showSearchDialog();
+            }
+        }));
+
+        toolsMenu.add(new JMenuItem(new AbstractAction("Clear Highlight") {
+            public void actionPerformed(ActionEvent e) {
+                editorPanel.clearHighlight();
+            }
+        }));
+
+        menuBar.add(toolsMenu);
+
         setJMenuBar(menuBar);
     }
 

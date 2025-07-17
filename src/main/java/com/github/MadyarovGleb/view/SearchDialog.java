@@ -2,108 +2,56 @@ package com.github.MadyarovGleb.view;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.util.Arrays;
 
 public class SearchDialog extends JDialog {
-    private JTextField searchField;
-    private JTextField maskField;
-    private JCheckBox caseSensitiveCheck;
-    private JButton searchButton;
-    private JButton cancelButton;
-
-    private byte[] searchPattern;
-    private byte[] maskPattern;
-    private boolean cancelled = true;
+    private JTextField patternField;
+    private boolean confirmed = false;
 
     public SearchDialog(Frame owner) {
-        super(owner, "Search", true);
-        initUI();
-    }
+        super(owner, "Search Pattern", true);
+        setLayout(new BorderLayout());
 
-    private void initUI() {
-        setLayout(new BorderLayout(5, 5));
-        setSize(400, 200);
+        patternField = new JTextField();
+        add(new JLabel("Enter hex pattern (e.g. DE AD ?? BE EF):"), BorderLayout.NORTH);
+        add(patternField, BorderLayout.CENTER);
 
-        JPanel inputPanel = new JPanel(new GridLayout(3, 2, 5, 5));
+        JPanel buttons = new JPanel();
+        JButton ok = new JButton("Search");
+        JButton cancel = new JButton("Cancel");
+        buttons.add(ok);
+        buttons.add(cancel);
+        add(buttons, BorderLayout.SOUTH);
 
-        inputPanel.add(new JLabel("Search for:"));
-        searchField = new JTextField();
-        inputPanel.add(searchField);
-
-        inputPanel.add(new JLabel("Mask (optional):"));
-        maskField = new JTextField();
-        inputPanel.add(maskField);
-
-        caseSensitiveCheck = new JCheckBox("Case sensitive");
-        inputPanel.add(caseSensitiveCheck);
-
-        add(inputPanel, BorderLayout.CENTER);
-
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        searchButton = new JButton("Search");
-        cancelButton = new JButton("Cancel");
-
-        searchButton.addActionListener(this::onSearch);
-        cancelButton.addActionListener(e -> dispose());
-
-        buttonPanel.add(searchButton);
-        buttonPanel.add(cancelButton);
-
-        add(buttonPanel, BorderLayout.SOUTH);
-
-        getRootPane().setDefaultButton(searchButton);
-    }
-
-    private void onSearch(ActionEvent e) {
-        String searchText = searchField.getText();
-        String maskText = maskField.getText();
-
-        if (searchText.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Please enter search pattern",
-                    "Error", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-
-        try {
-            searchPattern = searchText.getBytes();
-            if (!maskText.isEmpty()) {
-                maskPattern = maskText.getBytes();
-                if (maskPattern.length != searchPattern.length) {
-                    JOptionPane.showMessageDialog(this,
-                            "Mask length must match search pattern length",
-                            "Error", JOptionPane.ERROR_MESSAGE);
-                    return;
-                }
-            } else {
-                maskPattern = null;
-            }
-
-            if (!caseSensitiveCheck.isSelected()) {
-                searchPattern = new String(searchPattern).toLowerCase().getBytes();
-            }
-
-            cancelled = false;
+        ok.addActionListener(e -> {
+            confirmed = true;
             dispose();
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Invalid pattern: " + ex.getMessage(),
-                    "Error", JOptionPane.ERROR_MESSAGE);
+        });
+
+        cancel.addActionListener(e -> dispose());
+
+        setSize(400, 120);
+        setLocationRelativeTo(owner);
+    }
+
+    public boolean isConfirmed() {
+        return confirmed;
+    }
+
+    public byte[] getBytePattern() {
+        String[] tokens = patternField.getText().trim().split("\\s+");
+        byte[] pattern = new byte[tokens.length];
+        for (int i = 0; i < tokens.length; i++) {
+            pattern[i] = tokens[i].equals("??") ? 0 : (byte) Integer.parseInt(tokens[i], 16);
         }
+        return pattern;
     }
 
-    public boolean isCancelled() {
-        return cancelled;
-    }
-
-    public byte[] getSearchPattern() {
-        return Arrays.copyOf(searchPattern, searchPattern.length);
-    }
-
-    public byte[] getMaskPattern() {
-        return maskPattern != null ? Arrays.copyOf(maskPattern, maskPattern.length) : null;
-    }
-
-    public boolean isCaseSensitive() {
-        return caseSensitiveCheck.isSelected();
+    public boolean[] getMask() {
+        String[] tokens = patternField.getText().trim().split("\\s+");
+        boolean[] mask = new boolean[tokens.length];
+        for (int i = 0; i < tokens.length; i++) {
+            mask[i] = !tokens[i].equals("??");
+        }
+        return mask;
     }
 }
