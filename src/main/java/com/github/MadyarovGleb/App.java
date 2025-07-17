@@ -80,6 +80,27 @@ public class App extends JFrame {
         }));
 
         menuBar.add(fileMenu);
+
+        JMenu viewMenu = new JMenu("View");
+
+        JMenuItem viewByteItem = new JMenuItem("View as byte");
+        viewByteItem.addActionListener(e -> editorPanel.showSelectedValue(1));
+        viewMenu.add(viewByteItem);
+
+        JMenuItem viewShortItem = new JMenuItem("View as 2 bytes (short)");
+        viewShortItem.addActionListener(e -> editorPanel.showSelectedValue(2));
+        viewMenu.add(viewShortItem);
+
+        JMenuItem viewIntItem = new JMenuItem("View as 4 bytes (int/float)");
+        viewIntItem.addActionListener(e -> editorPanel.showSelectedValue(4));
+        viewMenu.add(viewIntItem);
+
+        JMenuItem viewLongItem = new JMenuItem("View as 8 bytes (long/double)");
+        viewLongItem.addActionListener(e -> editorPanel.showSelectedValue(8));
+        viewMenu.add(viewLongItem);
+
+        menuBar.add(viewMenu);
+
         setJMenuBar(menuBar);
     }
 

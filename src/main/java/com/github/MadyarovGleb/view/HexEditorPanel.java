@@ -12,14 +12,14 @@ public class HexEditorPanel extends JPanel {
     private JTable hexTable;
     private HexTableModel tableModel;
     private JLabel statusBar;
-    private FileModel fileModel; // Добавляем прямое хранение fileModel
+    private FileModel fileModel;
 
     public HexEditorPanel() {
         initEmptyUI();
     }
 
     public void setModel(FileModel fileModel, SelectionModel selectionModel) {
-        this.fileModel = fileModel; // Сохраняем fileModel
+        this.fileModel = fileModel;
         removeAll();
         try {
             initHexView(fileModel, selectionModel);
@@ -44,6 +44,7 @@ public class HexEditorPanel extends JPanel {
         tableModel = new HexTableModel(fileModel);
         hexTable = new JTable(tableModel);
         configureTable();
+        setupContextMenu();
 
         add(new JScrollPane(hexTable), BorderLayout.CENTER);
 
@@ -51,7 +52,6 @@ public class HexEditorPanel extends JPanel {
                 formatSize(fileModel.getFileSize()) + " ");
         add(statusBar, BorderLayout.SOUTH);
 
-        // Добавляем слушатели для всех изменений выделения
         hexTable.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 updateByteValue();
@@ -68,7 +68,7 @@ public class HexEditorPanel extends JPanel {
         int row = hexTable.getSelectedRow();
         int col = hexTable.getSelectedColumn();
 
-        if (row >= 0 && col >= 1) { // col >= 1 чтобы игнорировать колонку адресов
+        if (row >= 0 && col >= 1) {
             try {
                 long pos = tableModel.positionForCell(row, col);
                 ByteBuffer buffer = fileModel.getBytes(pos, 1);
@@ -108,5 +108,61 @@ public class HexEditorPanel extends JPanel {
 
     private void showError(String message) {
         JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+
+    private void setupContextMenu() {
+        JPopupMenu contextMenu = new JPopupMenu();
+
+        JMenuItem byteItem = new JMenuItem("View as byte");
+        byteItem.addActionListener(e -> showSelectedValue(1));
+        contextMenu.add(byteItem);
+
+        JMenuItem shortItem = new JMenuItem("View as 2 bytes (short)");
+        shortItem.addActionListener(e -> showSelectedValue(2));
+        contextMenu.add(shortItem);
+
+        JMenuItem intItem = new JMenuItem("View as 4 bytes (int/float)");
+        intItem.addActionListener(e -> showSelectedValue(4));
+        contextMenu.add(intItem);
+
+        JMenuItem longItem = new JMenuItem("View as 8 bytes (long/double)");
+        longItem.addActionListener(e -> showSelectedValue(8));
+        contextMenu.add(longItem);
+
+        hexTable.setComponentPopupMenu(contextMenu);
+    }
+
+    private void showValueDialog(long position, int byteCount) {
+        try {
+            byteCount = (int) Math.min(byteCount, fileModel.getFileSize() - position);
+
+            ByteBuffer buffer = fileModel.getBytes(position, byteCount);
+            byte[] data = new byte[buffer.remaining()];
+            buffer.get(data);
+
+            Frame parentFrame = (Frame) SwingUtilities.getWindowAncestor(this);
+            ValueInterpretationDialog dialog = new ValueInterpretationDialog(parentFrame, data, position);
+            dialog.setVisible(true);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Error reading data: " + ex.getMessage(),
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    public void showSelectedValue(int byteCount) {
+        int row = hexTable.getSelectedRow();
+        int col = hexTable.getSelectedColumn();
+
+        if (row >= 0 && col >= 1) {
+            long pos = tableModel.positionForCell(row, col);
+            showValueDialog(pos, byteCount);
+        } else {
+            JOptionPane.showMessageDialog(this,
+                    "Please select a cell first",
+                    "No Selection",
+                    JOptionPane.WARNING_MESSAGE);
+        }
     }
 }
