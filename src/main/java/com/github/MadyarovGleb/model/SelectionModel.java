@@ -33,7 +33,6 @@ public class SelectionModel {
         this.selectionEnd = end;
     }
 
-    // ✅ Добавляем недостающий метод
     public void setSelection(long start, long end) {
         this.selectionStart = start;
         this.selectionEnd = end;

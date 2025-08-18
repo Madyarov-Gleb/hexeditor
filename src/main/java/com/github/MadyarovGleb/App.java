@@ -5,7 +5,6 @@ import com.github.MadyarovGleb.model.ByteBufferFileModel;
 import com.github.MadyarovGleb.view.HexEditorPanel;
 
 import javax.swing.*;
-import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
@@ -69,61 +68,81 @@ public class App extends JFrame {
         add(editorPanel);
 
         JMenuBar menuBar = new JMenuBar();
-        JMenu fileMenu = new JMenu("File");
 
+        // ---- FILE ----
+        JMenu fileMenu = new JMenu("File");
         fileMenu.add(new JMenuItem(new AbstractAction("Open") {
             public void actionPerformed(ActionEvent e) { openFile(); }
         }));
-
         fileMenu.add(new JMenuItem(new AbstractAction("Save") {
             public void actionPerformed(ActionEvent e) { saveFile(); }
         }));
-
         menuBar.add(fileMenu);
 
-        JMenu viewMenu = new JMenu("View");
+        // ---- EDIT ----
+        JMenu editMenu = new JMenu("Edit");
 
+        editMenu.add(new JMenuItem(new AbstractAction("Copy") {
+            public void actionPerformed(ActionEvent e) { editorPanel.copySelection(); }
+        }));
+
+        editMenu.add(new JMenuItem(new AbstractAction("Cut (Zero Fill)") {
+            public void actionPerformed(ActionEvent e) { editorPanel.cutSelection(true); }
+        }));
+
+        editMenu.add(new JMenuItem(new AbstractAction("Cut (Shift Left)") {
+            public void actionPerformed(ActionEvent e) { editorPanel.cutSelection(false); }
+        }));
+
+        editMenu.add(new JMenuItem(new AbstractAction("Paste (Overwrite)") {
+            public void actionPerformed(ActionEvent e) { editorPanel.pasteClipboard(true); }
+        }));
+
+        editMenu.add(new JMenuItem(new AbstractAction("Paste (Insert)") {
+            public void actionPerformed(ActionEvent e) { editorPanel.pasteClipboard(false); }
+        }));
+
+        editMenu.addSeparator();
+
+        editMenu.add(new JMenuItem(new AbstractAction("Insert Bytes...") {
+            public void actionPerformed(ActionEvent e) { editorPanel.insertBytesDialog(); }
+        }));
+
+        editMenu.add(new JMenuItem(new AbstractAction("Delete Selected Bytes") {
+            public void actionPerformed(ActionEvent e) { editorPanel.showDeleteDialog(); }
+        }));
+
+        menuBar.add(editMenu);
+
+        // ---- VIEW ----
+        JMenu viewMenu = new JMenu("View");
         JMenuItem viewByteItem = new JMenuItem("View as byte");
         viewByteItem.addActionListener(e -> editorPanel.showSelectedValue(1));
         viewMenu.add(viewByteItem);
-
         JMenuItem viewShortItem = new JMenuItem("View as 2 bytes (short)");
         viewShortItem.addActionListener(e -> editorPanel.showSelectedValue(2));
         viewMenu.add(viewShortItem);
-
         JMenuItem viewIntItem = new JMenuItem("View as 4 bytes (int/float)");
         viewIntItem.addActionListener(e -> editorPanel.showSelectedValue(4));
         viewMenu.add(viewIntItem);
-
         JMenuItem viewLongItem = new JMenuItem("View as 8 bytes (long/double)");
         viewLongItem.addActionListener(e -> editorPanel.showSelectedValue(8));
         viewMenu.add(viewLongItem);
-
         menuBar.add(viewMenu);
 
+        // ---- TOOLS ----
         JMenu toolsMenu = new JMenu("Tools");
-
-        toolsMenu.add(new JMenuItem(new AbstractAction("Search...") {
+        toolsMenu.add(new JMenuItem(new AbstractAction("Search") {
             public void actionPerformed(ActionEvent e) {
                 editorPanel.showSearchDialog();
             }
         }));
-
         toolsMenu.add(new JMenuItem(new AbstractAction("Clear Highlight") {
             public void actionPerformed(ActionEvent e) {
                 editorPanel.clearHighlight();
             }
         }));
-
         menuBar.add(toolsMenu);
-
-        JMenu editMenu = new JMenu("Edit");
-
-        JMenuItem deleteItem = new JMenuItem("Delete Selected Bytes...");
-        deleteItem.addActionListener(e -> editorPanel.showDeleteDialog());
-
-        editMenu.add(deleteItem);
-        menuBar.add(editMenu);
 
         setJMenuBar(menuBar);
     }

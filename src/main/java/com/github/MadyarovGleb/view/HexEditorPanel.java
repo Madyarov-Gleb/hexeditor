@@ -23,6 +23,8 @@ public class HexEditorPanel extends JPanel {
     private int patternLength;
     private final Set<Long> highlightedPositions = new HashSet<>();
 
+    private byte[] clipboardData = null;
+
     public HexEditorPanel() {
         initEmptyUI();
     }
@@ -172,6 +174,7 @@ public class HexEditorPanel extends JPanel {
     private void setupContextMenu() {
         JPopupMenu menu = new JPopupMenu();
 
+        // ---- Просмотр значений ----
         JMenuItem byteItem = new JMenuItem("View as byte");
         byteItem.addActionListener(e -> showSelectedValue(1));
         menu.add(byteItem);
@@ -189,6 +192,33 @@ public class HexEditorPanel extends JPanel {
         menu.add(longItem);
 
         menu.addSeparator();
+
+        // ---- Редактирование ----
+        JMenuItem copyItem = new JMenuItem("Copy");
+        copyItem.addActionListener(e -> copySelection());
+        menu.add(copyItem);
+
+        JMenuItem cutZeroItem = new JMenuItem("Cut (Zero Fill)");
+        cutZeroItem.addActionListener(e -> cutSelection(true));
+        menu.add(cutZeroItem);
+
+        JMenuItem cutShiftItem = new JMenuItem("Cut (Shift Left)");
+        cutShiftItem.addActionListener(e -> cutSelection(false));
+        menu.add(cutShiftItem);
+
+        JMenuItem pasteOverwriteItem = new JMenuItem("Paste (Overwrite)");
+        pasteOverwriteItem.addActionListener(e -> pasteClipboard(true));
+        menu.add(pasteOverwriteItem);
+
+        JMenuItem pasteInsertItem = new JMenuItem("Paste (Insert)");
+        pasteInsertItem.addActionListener(e -> pasteClipboard(false));
+        menu.add(pasteInsertItem);
+
+        menu.addSeparator();
+
+        JMenuItem insertItem = new JMenuItem("Insert Bytes...");
+        insertItem.addActionListener(e -> insertBytesDialog());
+        menu.add(insertItem);
 
         JMenuItem deleteItem = new JMenuItem("Delete selected bytes...");
         deleteItem.addActionListener(e -> showDeleteDialog());
@@ -329,5 +359,86 @@ public class HexEditorPanel extends JPanel {
 
     private void showError(String message) {
         JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+
+    public void copySelection() {
+        if (!selectionModel.hasSelection()) {
+            showError("No bytes selected.");
+            return;
+        }
+        try {
+            long start = selectionModel.getSelectionStart();
+            long length = selectionModel.getSelectionLength();
+            ByteBuffer buf = fileModel.getBytes(start, (int) length);
+            clipboardData = new byte[buf.remaining()];
+            buf.get(clipboardData);
+            JOptionPane.showMessageDialog(this, "Copied " + length + " bytes.");
+        } catch (IOException e) {
+            showError("Copy failed: " + e.getMessage());
+        }
+    }
+
+    public void cutSelection(boolean fillWithZeros) {
+        if (!selectionModel.hasSelection()) {
+            showError("No bytes selected.");
+            return;
+        }
+        try {
+            long start = selectionModel.getSelectionStart();
+            long length = selectionModel.getSelectionLength();
+            ByteBuffer buf = fileModel.getBytes(start, (int) length);
+            clipboardData = new byte[buf.remaining()];
+            buf.get(clipboardData);
+            fileModel.deleteBytes(start, length, fillWithZeros);
+            selectionModel.clearSelection();
+            hexTable.clearSelection();
+            hexTable.repaint();
+            JOptionPane.showMessageDialog(this, "Cut " + length + " bytes.");
+        } catch (IOException e) {
+            showError("Cut failed: " + e.getMessage());
+        }
+    }
+
+    public void pasteClipboard(boolean overwrite) {
+        if (clipboardData == null || clipboardData.length == 0) {
+            showError("Clipboard is empty.");
+            return;
+        }
+        try {
+            long pos = selectionModel.hasSelection()
+                    ? selectionModel.getSelectionStart()
+                    : 0;
+            if (overwrite) {
+                fileModel.setBytes(pos, clipboardData);
+            } else {
+                fileModel.insertBytes(pos, clipboardData);
+            }
+            hexTable.repaint();
+            JOptionPane.showMessageDialog(this, "Pasted " + clipboardData.length + " bytes.");
+        } catch (IOException e) {
+            showError("Paste failed: " + e.getMessage());
+        }
+    }
+
+    public void insertBytesDialog() {
+        String input = JOptionPane.showInputDialog(this,
+                "Enter hex bytes to insert (e.g. DE AD BE EF):");
+        if (input == null || input.trim().isEmpty()) return;
+
+        try {
+            String[] tokens = input.trim().split("\\s+");
+            byte[] data = new byte[tokens.length];
+            for (int i = 0; i < tokens.length; i++) {
+                data[i] = (byte) Integer.parseInt(tokens[i], 16);
+            }
+            long pos = selectionModel.hasSelection()
+                    ? selectionModel.getSelectionStart()
+                    : 0;
+            fileModel.insertBytes(pos, data);
+            hexTable.repaint();
+            JOptionPane.showMessageDialog(this, "Inserted " + data.length + " bytes.");
+        } catch (Exception e) {
+            showError("Insert failed: " + e.getMessage());
+        }
     }
 }
