@@ -17,7 +17,7 @@ public class App extends JFrame {
     public App() {
         initUI();
         setTitle("HEX Editor");
-        setSize(800, 600);
+        setSize(1000, 700);
         setLocationRelativeTo(null);
 
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
@@ -69,7 +69,6 @@ public class App extends JFrame {
 
         JMenuBar menuBar = new JMenuBar();
 
-        // ---- FILE ----
         JMenu fileMenu = new JMenu("File");
         fileMenu.add(new JMenuItem(new AbstractAction("Open") {
             public void actionPerformed(ActionEvent e) { openFile(); }
@@ -79,7 +78,6 @@ public class App extends JFrame {
         }));
         menuBar.add(fileMenu);
 
-        // ---- EDIT ----
         JMenu editMenu = new JMenu("Edit");
 
         editMenu.add(new JMenuItem(new AbstractAction("Copy") {
@@ -104,7 +102,7 @@ public class App extends JFrame {
 
         editMenu.addSeparator();
 
-        editMenu.add(new JMenuItem(new AbstractAction("Insert Bytes...") {
+        editMenu.add(new JMenuItem(new AbstractAction("Insert Bytes") {
             public void actionPerformed(ActionEvent e) { editorPanel.insertBytesDialog(); }
         }));
 
@@ -114,7 +112,6 @@ public class App extends JFrame {
 
         menuBar.add(editMenu);
 
-        // ---- VIEW ----
         JMenu viewMenu = new JMenu("View");
         JMenuItem viewByteItem = new JMenuItem("View as byte");
         viewByteItem.addActionListener(e -> editorPanel.showSelectedValue(1));
@@ -130,7 +127,6 @@ public class App extends JFrame {
         viewMenu.add(viewLongItem);
         menuBar.add(viewMenu);
 
-        // ---- TOOLS ----
         JMenu toolsMenu = new JMenu("Tools");
         toolsMenu.add(new JMenuItem(new AbstractAction("Search") {
             public void actionPerformed(ActionEvent e) {

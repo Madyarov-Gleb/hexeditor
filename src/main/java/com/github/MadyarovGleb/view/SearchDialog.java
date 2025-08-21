@@ -41,7 +41,7 @@ public class SearchDialog extends JDialog {
         String[] tokens = patternField.getText().trim().split("\\s+");
         byte[] pattern = new byte[tokens.length];
         for (int i = 0; i < tokens.length; i++) {
-            pattern[i] = tokens[i].equals("??") ? 0 : (byte) Integer.parseInt(tokens[i], 16);
+            pattern[i] = tokens[i].equalsIgnoreCase("??") ? 0 : (byte) Integer.parseInt(tokens[i], 16);
         }
         return pattern;
     }
@@ -50,7 +50,7 @@ public class SearchDialog extends JDialog {
         String[] tokens = patternField.getText().trim().split("\\s+");
         boolean[] mask = new boolean[tokens.length];
         for (int i = 0; i < tokens.length; i++) {
-            mask[i] = !tokens[i].equals("??");
+            mask[i] = !tokens[i].equalsIgnoreCase("??");
         }
         return mask;
     }

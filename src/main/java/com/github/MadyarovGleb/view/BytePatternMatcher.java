@@ -12,9 +12,11 @@ public class BytePatternMatcher {
         List<Long> results = new ArrayList<>();
         long fileSize = fileModel.getFileSize();
         int patternLength = pattern.length;
+        if (patternLength == 0) return results;
 
         for (long i = 0; i <= fileSize - patternLength; i++) {
             ByteBuffer buffer = fileModel.getBytes(i, patternLength);
+            if (buffer.remaining() < patternLength) break;
             boolean match = true;
             for (int j = 0; j < patternLength; j++) {
                 byte actual = buffer.get(j);

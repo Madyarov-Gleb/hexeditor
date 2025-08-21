@@ -2,7 +2,6 @@ package com.github.MadyarovGleb.controller;
 
 import com.github.MadyarovGleb.model.FileModel;
 import com.github.MadyarovGleb.model.SelectionModel;
-import javax.swing.*;
 import java.nio.ByteBuffer;
 import java.io.IOException;
 
@@ -39,6 +38,7 @@ public class HexEditorController {
 
     public byte getByteAt(long position) throws IOException {
         ByteBuffer buffer = fileModel.getBytes(position, 1);
+        if (buffer.remaining() == 0) throw new IOException("Position OOB");
         return buffer.get();
     }
 }

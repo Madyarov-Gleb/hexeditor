@@ -23,6 +23,10 @@ public class HexEditorPanel extends JPanel {
     private int patternLength;
     private final Set<Long> highlightedPositions = new HashSet<>();
 
+    private JSpinner bytesPerRowSpinner;
+    private JSpinner rowsPerPageSpinner;
+    private JTextField offsetField;
+
     private byte[] clipboardData = null;
 
     public HexEditorPanel() {
@@ -53,6 +57,27 @@ public class HexEditorPanel extends JPanel {
     private void initHexView(FileModel fileModel) throws IOException {
         setLayout(new BorderLayout());
 
+        JPanel control = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        bytesPerRowSpinner = new JSpinner(new SpinnerNumberModel(16, 1, 4096, 1));
+        rowsPerPageSpinner = new JSpinner(new SpinnerNumberModel(64, 1, 2000, 1));
+        offsetField = new JTextField("0", 12);
+
+        JButton apply = new JButton("Go");
+        JButton prev = new JButton("Prev");
+        JButton next = new JButton("Next");
+
+        control.add(new JLabel("Bytes/Row:"));
+        control.add(bytesPerRowSpinner);
+        control.add(new JLabel("Rows:"));
+        control.add(rowsPerPageSpinner);
+        control.add(new JLabel("Offset (hex):"));
+        control.add(offsetField);
+        control.add(apply);
+        control.add(prev);
+        control.add(next);
+
+        add(control, BorderLayout.NORTH);
+
         tableModel = new HexTableModel(fileModel);
         hexTable = new JTable(tableModel);
         configureTable();
@@ -61,7 +86,7 @@ public class HexEditorPanel extends JPanel {
         add(new JScrollPane(hexTable), BorderLayout.CENTER);
 
         statusBar = new JLabel(" " + fileModel.getFilePath() + " | Size: " +
-                formatSize(fileModel.getFileSize()) + " ");
+                formatSize(fileModelSafeSize()) + " ");
         add(statusBar, BorderLayout.SOUTH);
 
         hexTable.getSelectionModel().addListSelectionListener(e -> {
@@ -76,6 +101,64 @@ public class HexEditorPanel extends JPanel {
                 updateSelectionModel();
             }
         });
+
+        bytesPerRowSpinner.addChangeListener(e -> {
+            tableModel.setBytesPerRow((Integer) bytesPerRowSpinner.getValue());
+            reconfigureColumns();
+            updateStatusBar();
+        });
+
+        rowsPerPageSpinner.addChangeListener(e -> {
+            tableModel.setRowsPerPage((Integer) rowsPerPageSpinner.getValue());
+            reconfigureColumns();
+            updateStatusBar();
+        });
+
+        apply.addActionListener(e -> {
+            try {
+                long off = parseHexOffset(offsetField.getText());
+                tableModel.setFileOffset(off);
+                hexTable.clearSelection();
+                updateStatusBar();
+            } catch (Exception ex) {
+                showError("Invalid offset");
+            }
+        });
+
+        prev.addActionListener(e -> {
+            long step = (long) tableModel.getBytesPerRow() * tableModel.getRowsPerPage();
+            long newOff = Math.max(0, tableModel.getFileOffset() - step);
+            tableModel.setFileOffset(newOff);
+            offsetField.setText(Long.toHexString(newOff).toUpperCase());
+            hexTable.clearSelection();
+            updateStatusBar();
+        });
+
+        next.addActionListener(e -> {
+            try {
+                long step = (long) tableModel.getBytesPerRow() * tableModel.getRowsPerPage();
+                long max = tableModel.getMaxOffset();
+                long newOff = Math.min(max, tableModel.getFileOffset() + step);
+                tableModel.setFileOffset(newOff);
+                offsetField.setText(Long.toHexString(newOff).toUpperCase());
+                hexTable.clearSelection();
+                updateStatusBar();
+            } catch (IOException ex) {
+                showError("Cannot move to next page: " + ex.getMessage());
+            }
+        });
+
+        offsetField.setText("0");
+        reconfigureColumns();
+        updateStatusBar();
+    }
+
+    private long fileModelSafeSize() {
+        try {
+            return fileModel.getFileSize();
+        } catch (IOException e) {
+            return 0L;
+        }
     }
 
     private void updateSelectionModel() {
@@ -92,7 +175,7 @@ public class HexEditorPanel extends JPanel {
 
         for (int row : selectedRows) {
             for (int col : selectedCols) {
-                if (col < 1) continue; // пропускаем колонку с оффсетом
+                if (col < 1) continue;
                 long pos = tableModel.positionForCell(row, col);
                 if (minPos == null || pos < minPos) minPos = pos;
                 if (maxPos == null || pos > maxPos) maxPos = pos;
@@ -114,15 +197,38 @@ public class HexEditorPanel extends JPanel {
             try {
                 long pos = tableModel.positionForCell(row, col);
                 ByteBuffer buffer = fileModel.getBytes(pos, 1);
+                if (buffer.remaining() == 0) {
+                    statusBar.setText(" Out of range ");
+                    return;
+                }
                 byte b = buffer.get();
 
-                String status = String.format("Byte: %d (signed) | %d (unsigned) | Hex: %02X",
-                        b, Byte.toUnsignedInt(b), b);
+                String status = String.format("Offset: 0x%08X | Byte: %d (signed) | %d (unsigned) | Hex: %02X",
+                        pos, b, Byte.toUnsignedInt(b), b);
                 statusBar.setText(status);
 
             } catch (IOException ex) {
                 statusBar.setText("Error reading byte");
             }
+        } else {
+            updateStatusBar();
+        }
+    }
+
+    private void updateStatusBar() {
+        try {
+            long start = tableModel.getFileOffset();
+            long end = Math.min(fileModel.getFileSize(),
+                    start + (long) tableModel.getBytesPerRow() * tableModel.getRowsPerPage()) - 1;
+            if (end < start) end = start;
+            statusBar.setText(String.format(" %s | Size: %s | View: 0x%08X - 0x%08X | BPR=%d Rows=%d",
+                    fileModel.getFilePath(),
+                    formatSize(fileModel.getFileSize()),
+                    start, end,
+                    tableModel.getBytesPerRow(), tableModel.getRowsPerPage()
+            ));
+        } catch (IOException e) {
+            statusBar.setText(" Status unavailable ");
         }
     }
 
@@ -153,10 +259,8 @@ public class HexEditorPanel extends JPanel {
 
         for (int i = 0; i < tableModel.getColumnCount(); i++) {
             hexTable.getColumnModel().getColumn(i).setCellRenderer(renderer);
-            hexTable.getColumnModel().getColumn(i).setPreferredWidth(30);
+            hexTable.getColumnModel().getColumn(i).setPreferredWidth(i == 0 ? 100 : 30);
         }
-
-        hexTable.getColumnModel().getColumn(0).setPreferredWidth(80); // Offset column
 
         hexTable.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent evt) {
@@ -171,10 +275,21 @@ public class HexEditorPanel extends JPanel {
         });
     }
 
+    private void reconfigureColumns() {
+        if (hexTable.getColumnModel().getColumnCount() != tableModel.getColumnCount()) {
+            hexTable.createDefaultColumnsFromModel();
+        }
+        for (int i = 0; i < tableModel.getColumnCount(); i++) {
+            int w = (i == 0) ? 100 : 30;
+            hexTable.getColumnModel().getColumn(i).setPreferredWidth(w);
+        }
+        hexTable.revalidate();
+        hexTable.repaint();
+    }
+
     private void setupContextMenu() {
         JPopupMenu menu = new JPopupMenu();
 
-        // ---- Просмотр значений ----
         JMenuItem byteItem = new JMenuItem("View as byte");
         byteItem.addActionListener(e -> showSelectedValue(1));
         menu.add(byteItem);
@@ -193,7 +308,6 @@ public class HexEditorPanel extends JPanel {
 
         menu.addSeparator();
 
-        // ---- Редактирование ----
         JMenuItem copyItem = new JMenuItem("Copy");
         copyItem.addActionListener(e -> copySelection());
         menu.add(copyItem);
@@ -230,6 +344,10 @@ public class HexEditorPanel extends JPanel {
     private void showValueDialog(long position, int byteCount) {
         try {
             byteCount = (int) Math.min(byteCount, fileModel.getFileSize() - position);
+            if (byteCount <= 0) {
+                showError("Nothing to display at this position");
+                return;
+            }
             ByteBuffer buffer = fileModel.getBytes(position, byteCount);
             byte[] data = new byte[buffer.remaining()];
             buffer.get(data);
@@ -296,6 +414,10 @@ public class HexEditorPanel extends JPanel {
 
         try {
             ByteBuffer buffer = fileModel.getBytes(pos, 1);
+            if (buffer.remaining() == 0) {
+                showError("Position out of bounds");
+                return;
+            }
             byte current = buffer.get();
 
             String hexValue = JOptionPane.showInputDialog(this,
@@ -351,16 +473,6 @@ public class HexEditorPanel extends JPanel {
         }
     }
 
-    private String formatSize(long size) {
-        if (size < 1024) return size + " bytes";
-        if (size < 1024 * 1024) return String.format("%.1f KB", size / 1024.0);
-        return String.format("%.1f MB", size / (1024.0 * 1024));
-    }
-
-    private void showError(String message) {
-        JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
-    }
-
     public void copySelection() {
         if (!selectionModel.hasSelection()) {
             showError("No bytes selected.");
@@ -407,7 +519,7 @@ public class HexEditorPanel extends JPanel {
         try {
             long pos = selectionModel.hasSelection()
                     ? selectionModel.getSelectionStart()
-                    : 0;
+                    : tableModel.getFileOffset();
             if (overwrite) {
                 fileModel.setBytes(pos, clipboardData);
             } else {
@@ -433,12 +545,30 @@ public class HexEditorPanel extends JPanel {
             }
             long pos = selectionModel.hasSelection()
                     ? selectionModel.getSelectionStart()
-                    : 0;
+                    : tableModel.getFileOffset();
             fileModel.insertBytes(pos, data);
             hexTable.repaint();
             JOptionPane.showMessageDialog(this, "Inserted " + data.length + " bytes.");
         } catch (Exception e) {
             showError("Insert failed: " + e.getMessage());
         }
+    }
+
+    private String formatSize(long size) {
+        if (size < 1024) return size + " bytes";
+        if (size < 1024 * 1024) return String.format("%.1f KB", size / 1024.0);
+        if (size < 1024L * 1024L * 1024L) return String.format("%.1f MB", size / (1024.0 * 1024));
+        return String.format("%.1f GB", size / (1024.0 * 1024 * 1024));
+    }
+
+    private void showError(String message) {
+        JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+
+    private long parseHexOffset(String text) {
+        String t = text.trim();
+        if (t.startsWith("0x") || t.startsWith("0X")) t = t.substring(2);
+        if (t.isEmpty()) return 0;
+        return Long.parseUnsignedLong(t, 16);
     }
 }

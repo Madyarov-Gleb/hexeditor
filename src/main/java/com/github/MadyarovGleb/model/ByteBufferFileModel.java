@@ -12,6 +12,8 @@ public class ByteBufferFileModel implements FileModel {
     private Path filePath;
     private boolean modified;
 
+    private static final int MOVE_BUFFER = 1 * 1024 * 1024;
+
     public ByteBufferFileModel(Path filePath) throws IOException {
         this.filePath = filePath;
         this.file = new RandomAccessFile(filePath.toFile(), "rw");
@@ -26,7 +28,12 @@ public class ByteBufferFileModel implements FileModel {
 
     @Override
     public ByteBuffer getBytes(long offset, int length) throws IOException {
-        length = (int) Math.min(length, getFileSize() - offset);
+        long size = getFileSize();
+        if (offset < 0 || offset >= size) {
+            return ByteBuffer.allocate(0);
+        }
+        if (length < 0) length = 0;
+        length = (int) Math.min(length, size - offset);
         ByteBuffer buffer = ByteBuffer.allocate(length);
         channel.read(buffer, offset);
         buffer.rewind();
@@ -35,6 +42,7 @@ public class ByteBufferFileModel implements FileModel {
 
     @Override
     public void setBytes(long offset, byte[] data) throws IOException {
+        if (offset < 0) throw new IOException("Negative offset");
         ByteBuffer buffer = ByteBuffer.wrap(data);
         channel.write(buffer, offset);
         modified = true;
@@ -50,41 +58,81 @@ public class ByteBufferFileModel implements FileModel {
         if (offset < 0 || offset > getFileSize()) {
             throw new IllegalArgumentException("Invalid offset");
         }
+        long size = getFileSize();
+        long tail = size - offset;
+        long newSize = size + data.length;
 
-        long fileSize = getFileSize();
-        long newSize = fileSize + data.length;
+        file.setLength(newSize);
 
-        ByteBuffer tail = getBytes(offset, (int)(fileSize - offset));
+        long readPos = size - MOVE_BUFFER;
+        long writePos = newSize - MOVE_BUFFER;
+        long remaining = tail;
 
-        channel.truncate(offset);
+        ByteBuffer buf = ByteBuffer.allocate(MOVE_BUFFER);
+
+        while (remaining > 0) {
+            int chunk = (int) Math.min(MOVE_BUFFER, remaining);
+            long srcPos = offset + remaining - chunk;
+            long dstPos = srcPos + data.length;
+
+            buf.clear();
+            buf.limit(chunk);
+            channel.read(buf, srcPos);
+            buf.flip();
+            channel.write(buf, dstPos);
+
+            remaining -= chunk;
+        }
 
         setBytes(offset, data);
-
-        if (tail.hasRemaining()) {
-            channel.write(tail, offset + data.length);
-        }
 
         modified = true;
     }
 
     @Override
     public void deleteBytes(long offset, long length, boolean fillWithZeros) throws IOException {
-        if (offset < 0 || offset + length > getFileSize()) {
+        if (offset < 0 || length < 0 || offset + length > getFileSize()) {
             throw new IllegalArgumentException("Invalid offset or length");
         }
 
         if (fillWithZeros) {
-            byte[] zeros = new byte[(int)length];
-            setBytes(offset, zeros);
-        } else {
-            long fileSize = getFileSize();
-            ByteBuffer tail = getBytes(offset + length, (int)(fileSize - offset - length));
+            int chunkSize = MOVE_BUFFER;
+            long remaining = length;
+            long pos = offset;
+            byte[] zeros = new byte[chunkSize];
 
-            channel.truncate(offset);
-
-            if (tail.hasRemaining()) {
-                channel.write(tail, offset);
+            while (remaining > 0) {
+                int chunk = (int) Math.min(chunkSize, remaining);
+                ByteBuffer z = ByteBuffer.wrap(zeros, 0, chunk);
+                channel.write(z, pos);
+                remaining -= chunk;
+                pos += chunk;
             }
+        } else {
+            long size = getFileSize();
+            long tailOffset = offset + length;
+            long tailLen = size - tailOffset;
+
+            long remaining = tailLen;
+            ByteBuffer buf = ByteBuffer.allocate(MOVE_BUFFER);
+
+            long src = tailOffset;
+            long dst = offset;
+
+            while (remaining > 0) {
+                int chunk = (int) Math.min(MOVE_BUFFER, remaining);
+                buf.clear();
+                buf.limit(chunk);
+                channel.read(buf, src);
+                buf.flip();
+                channel.write(buf, dst);
+
+                src += chunk;
+                dst += chunk;
+                remaining -= chunk;
+            }
+
+            file.setLength(size - length);
         }
 
         modified = true;
