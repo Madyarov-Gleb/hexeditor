@@ -6,6 +6,7 @@ import com.github.MadyarovGleb.model.SelectionModel;
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
 import java.awt.*;
+import java.awt.event.ActionEvent;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashSet;

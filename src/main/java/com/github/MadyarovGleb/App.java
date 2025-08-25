@@ -60,7 +60,6 @@ public class App extends JFrame {
             }
         }
         dispose();
-        System.exit(0);
     }
 
     private void initUI() {
