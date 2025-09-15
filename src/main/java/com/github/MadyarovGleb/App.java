@@ -143,6 +143,14 @@ public class App extends JFrame {
     }
 
     private void openFile() {
+        if (controller != null) {
+            try {
+                controller.close();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+
         JFileChooser fc = new JFileChooser();
         if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             try {

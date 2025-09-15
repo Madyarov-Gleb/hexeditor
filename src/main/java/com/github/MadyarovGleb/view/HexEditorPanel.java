@@ -37,6 +37,10 @@ public class HexEditorPanel extends JPanel {
     public void setModel(FileModel fileModel, SelectionModel selectionModel) {
         this.fileModel = fileModel;
         this.selectionModel = selectionModel;
+
+        highlightedPositions.clear();
+        searchResults = null;
+
         removeAll();
         try {
             initHexView(fileModel);
@@ -466,6 +470,11 @@ public class HexEditorPanel extends JPanel {
         boolean fillWithZeros = (choice == 0);
         try {
             fileModel.deleteBytes(start, length, fillWithZeros);
+
+            for (long pos = start; pos <= end; pos++) {
+                highlightedPositions.remove(pos);
+            }
+
             selectionModel.clearSelection();
             hexTable.clearSelection();
             hexTable.repaint();

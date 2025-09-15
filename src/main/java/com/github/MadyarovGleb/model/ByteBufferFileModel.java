@@ -153,8 +153,12 @@ public class ByteBufferFileModel implements FileModel {
 
     @Override
     public void close() throws IOException {
-        channel.close();
-        file.close();
+        if (channel != null && channel.isOpen()) {
+            channel.close();
+        }
+        if (file != null) {
+            file.close();
+        }
     }
 
     @Override
