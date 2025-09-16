@@ -388,22 +388,40 @@ public class HexEditorPanel extends JPanel {
         try {
             byte[] pattern = dialog.getBytePattern();
             boolean[] mask = dialog.getMask();
-            searchResults = BytePatternMatcher.search(fileModel, pattern, mask);
-            highlightedPositions.clear();
 
-            for (long pos : searchResults) {
-                for (int i = 0; i < pattern.length; i++) {
-                    highlightedPositions.add(pos + i);
+            SwingWorker<List<Long>, Void> worker = new SwingWorker<>() {
+                @Override
+                protected List<Long> doInBackground() throws Exception {
+                    return BytePatternMatcher.search(fileModel, pattern, mask);
                 }
-            }
 
-            if (searchResults.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "No matches found.");
-            } else {
-                patternLength = pattern.length;
-                hexTable.repaint();
-                JOptionPane.showMessageDialog(this, "Found " + searchResults.size() + " match(es).");
-            }
+                @Override
+                protected void done() {
+                    try {
+                        searchResults = get();
+                        highlightedPositions.clear();
+
+                        for (long pos : searchResults) {
+                            for (int i = 0; i < pattern.length; i++) {
+                                highlightedPositions.add(pos + i);
+                            }
+                        }
+
+                        if (searchResults.isEmpty()) {
+                            JOptionPane.showMessageDialog(HexEditorPanel.this, "No matches found.");
+                        } else {
+                            patternLength = pattern.length;
+                            hexTable.repaint();
+                            JOptionPane.showMessageDialog(HexEditorPanel.this,
+                                    "Found " + searchResults.size() + " match(es).");
+                        }
+                    } catch (Exception ex) {
+                        showError("Search error: " + ex.getMessage());
+                    }
+                }
+            };
+
+            worker.execute();
         } catch (Exception ex) {
             showError("Search error: " + ex.getMessage());
         }
@@ -455,7 +473,7 @@ public class HexEditorPanel extends JPanel {
         long end = selectionModel.getSelectionEnd();
         long length = end - start + 1;
 
-        Object[] options = { "Zero Fill", "Shift Left (Remove)" };
+        Object[] options = {"Zero Fill", "Shift Left (Remove)"};
         int choice = JOptionPane.showOptionDialog(this,
                 String.format("Delete %d byte(s):", length),
                 "Delete Bytes",
@@ -468,20 +486,34 @@ public class HexEditorPanel extends JPanel {
         if (choice == -1) return;
 
         boolean fillWithZeros = (choice == 0);
-        try {
-            fileModel.deleteBytes(start, length, fillWithZeros);
 
-            for (long pos = start; pos <= end; pos++) {
-                highlightedPositions.remove(pos);
+        SwingWorker<Void, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Void doInBackground() throws Exception {
+                fileModel.deleteBytes(start, length, fillWithZeros);
+                return null;
             }
 
-            selectionModel.clearSelection();
-            hexTable.clearSelection();
-            hexTable.repaint();
-        } catch (IOException e) {
-            showError("Delete failed: " + e.getMessage());
-        }
+            @Override
+            protected void done() {
+                try {
+                    get();
+                    for (long pos = start; pos <= end; pos++) {
+                        highlightedPositions.remove(pos);
+                    }
+                    selectionModel.clearSelection();
+                    hexTable.clearSelection();
+                    hexTable.repaint();
+                    JOptionPane.showMessageDialog(HexEditorPanel.this,
+                            "Deleted " + length + " byte(s).");
+                } catch (Exception ex) {
+                    showError("Delete failed: " + ex.getMessage());
+                }
+            }
+        };
+        worker.execute();
     }
+
 
     public void copySelection() {
         if (!selectionModel.hasSelection()) {
@@ -526,20 +558,35 @@ public class HexEditorPanel extends JPanel {
             showError("Clipboard is empty.");
             return;
         }
-        try {
-            long pos = selectionModel.hasSelection()
-                    ? selectionModel.getSelectionStart()
-                    : tableModel.getFileOffset();
-            if (overwrite) {
-                fileModel.setBytes(pos, clipboardData);
-            } else {
-                fileModel.insertBytes(pos, clipboardData);
+
+        long pos = selectionModel.hasSelection()
+                ? selectionModel.getSelectionStart()
+                : tableModel.getFileOffset();
+
+        SwingWorker<Void, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Void doInBackground() throws Exception {
+                if (overwrite) {
+                    fileModel.setBytes(pos, clipboardData);
+                } else {
+                    fileModel.insertBytes(pos, clipboardData);
+                }
+                return null;
             }
-            hexTable.repaint();
-            JOptionPane.showMessageDialog(this, "Pasted " + clipboardData.length + " bytes.");
-        } catch (IOException e) {
-            showError("Paste failed: " + e.getMessage());
-        }
+
+            @Override
+            protected void done() {
+                try {
+                    get();
+                    hexTable.repaint();
+                    JOptionPane.showMessageDialog(HexEditorPanel.this,
+                            "Pasted " + clipboardData.length + " bytes.");
+                } catch (Exception ex) {
+                    showError("Paste failed: " + ex.getMessage());
+                }
+            }
+        };
+        worker.execute();
     }
 
     public void insertBytesDialog() {
@@ -556,9 +603,27 @@ public class HexEditorPanel extends JPanel {
             long pos = selectionModel.hasSelection()
                     ? selectionModel.getSelectionStart()
                     : tableModel.getFileOffset();
-            fileModel.insertBytes(pos, data);
-            hexTable.repaint();
-            JOptionPane.showMessageDialog(this, "Inserted " + data.length + " bytes.");
+
+            SwingWorker<Void, Void> worker = new SwingWorker<>() {
+                @Override
+                protected Void doInBackground() throws Exception {
+                    fileModel.insertBytes(pos, data);
+                    return null;
+                }
+
+                @Override
+                protected void done() {
+                    try {
+                        get();
+                        hexTable.repaint();
+                        JOptionPane.showMessageDialog(HexEditorPanel.this,
+                                "Inserted " + data.length + " bytes.");
+                    } catch (Exception ex) {
+                        showError("Insert failed: " + ex.getMessage());
+                    }
+                }
+            };
+            worker.execute();
         } catch (Exception e) {
             showError("Insert failed: " + e.getMessage());
         }
