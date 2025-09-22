@@ -5,47 +5,112 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
+import java.util.Arrays;
 
 public class ByteBufferFileModel implements FileModel {
-    private RandomAccessFile file;
-    private FileChannel channel;
-    private Path filePath;
+    private final Path filePath;
+    private byte[] data;
     private boolean modified;
-
-    private static final int MOVE_BUFFER = 1 * 1024 * 1024;
 
     public ByteBufferFileModel(Path filePath) throws IOException {
         this.filePath = filePath;
-        this.file = new RandomAccessFile(filePath.toFile(), "rw");
-        this.channel = file.getChannel();
-        this.modified = false;
+        try (RandomAccessFile raf = new RandomAccessFile(filePath.toFile(), "r")) {
+            FileChannel ch = raf.getChannel();
+            long size = ch.size();
+            if (size > Integer.MAX_VALUE) {
+                throw new IOException("Файл слишком большой");
+            }
+            data = new byte[(int) size];
+            ByteBuffer buf = ByteBuffer.wrap(data);
+            ch.read(buf);
+        }
+        modified = false;
     }
 
     @Override
-    public long getFileSize() throws IOException {
-        return channel.size();
+    public long getFileSize() {
+        return data.length;
     }
 
     @Override
-    public ByteBuffer getBytes(long offset, int length) throws IOException {
-        long size = getFileSize();
-        if (offset < 0 || offset >= size) {
+    public ByteBuffer getBytes(long offset, int length) {
+        if (offset < 0 || offset >= data.length) {
             return ByteBuffer.allocate(0);
         }
-        if (length < 0) length = 0;
-        length = (int) Math.min(length, size - offset);
-        ByteBuffer buffer = ByteBuffer.allocate(length);
-        channel.read(buffer, offset);
-        buffer.rewind();
-        return buffer;
+        int actualLen = (int) Math.min(length, data.length - offset);
+        return ByteBuffer.wrap(Arrays.copyOfRange(data, (int) offset, (int) offset + actualLen));
     }
 
     @Override
-    public void setBytes(long offset, byte[] data) throws IOException {
-        if (offset < 0) throw new IOException("Negative offset");
-        ByteBuffer buffer = ByteBuffer.wrap(data);
-        channel.write(buffer, offset);
+    public void setBytes(long offset, byte[] bytes) throws IOException {
+        if (offset < 0 || offset + bytes.length > data.length) {
+            throw new IOException("Неверный диапазон записи");
+        }
+        System.arraycopy(bytes, 0, data, (int) offset, bytes.length);
         modified = true;
+    }
+
+    @Override
+    public void setByte(long pos, byte value) throws IOException {
+        if (pos < 0 || pos >= data.length) {
+            throw new IOException("Выход за пределы файла");
+        }
+        data[(int) pos] = value;
+        modified = true;
+    }
+
+    @Override
+    public void insertBytes(long offset, byte[] bytes) throws IOException {
+        if (offset < 0 || offset > data.length) {
+            throw new IOException("Неверный offset");
+        }
+        byte[] newData = new byte[data.length + bytes.length];
+        System.arraycopy(data, 0, newData, 0, (int) offset);
+        System.arraycopy(bytes, 0, newData, (int) offset, bytes.length);
+        System.arraycopy(data, (int) offset, newData, (int) offset + bytes.length, data.length - (int) offset);
+        data = newData;
+        modified = true;
+    }
+
+    @Override
+    public void deleteBytes(long offset, long length, boolean fillWithZeros) throws IOException {
+        if (offset < 0 || length < 0 || offset + length > data.length) {
+            throw new IOException("Неверный offset/length");
+        }
+        if (fillWithZeros) {
+            Arrays.fill(data, (int) offset, (int) (offset + length), (byte) 0);
+        } else {
+            byte[] newData = new byte[data.length - (int) length];
+            System.arraycopy(data, 0, newData, 0, (int) offset);
+            System.arraycopy(data, (int) (offset + length), newData, (int) offset, data.length - (int) (offset + length));
+            data = newData;
+        }
+        modified = true;
+    }
+
+    @Override
+    public void save() throws IOException {
+        if (!modified) return;
+        try (RandomAccessFile raf = new RandomAccessFile(filePath.toFile(), "rw")) {
+            raf.setLength(data.length);
+            raf.write(data);
+        }
+        modified = false;
+    }
+
+    @Override
+    public void saveAs(String path) throws IOException {
+        try (RandomAccessFile raf = new RandomAccessFile(path, "rw")) {
+            raf.setLength(data.length);
+            raf.write(data);
+        }
+        modified = false;
+    }
+
+    @Override
+    public void close() {
+        data = null;
+        modified = false;
     }
 
     @Override
@@ -54,128 +119,7 @@ public class ByteBufferFileModel implements FileModel {
     }
 
     @Override
-    public void insertBytes(long offset, byte[] data) throws IOException {
-        if (offset < 0 || offset > getFileSize()) {
-            throw new IllegalArgumentException("Invalid offset");
-        }
-        long size = getFileSize();
-        long tail = size - offset;
-        long newSize = size + data.length;
-
-        file.setLength(newSize);
-
-        long readPos = size - MOVE_BUFFER;
-        long writePos = newSize - MOVE_BUFFER;
-        long remaining = tail;
-
-        ByteBuffer buf = ByteBuffer.allocate(MOVE_BUFFER);
-
-        while (remaining > 0) {
-            int chunk = (int) Math.min(MOVE_BUFFER, remaining);
-            long srcPos = offset + remaining - chunk;
-            long dstPos = srcPos + data.length;
-
-            buf.clear();
-            buf.limit(chunk);
-            channel.read(buf, srcPos);
-            buf.flip();
-            channel.write(buf, dstPos);
-
-            remaining -= chunk;
-        }
-
-        setBytes(offset, data);
-
-        modified = true;
-    }
-
-    @Override
-    public void deleteBytes(long offset, long length, boolean fillWithZeros) throws IOException {
-        if (offset < 0 || length < 0 || offset + length > getFileSize()) {
-            throw new IllegalArgumentException("Invalid offset or length");
-        }
-
-        if (fillWithZeros) {
-            int chunkSize = MOVE_BUFFER;
-            long remaining = length;
-            long pos = offset;
-            byte[] zeros = new byte[chunkSize];
-
-            while (remaining > 0) {
-                int chunk = (int) Math.min(chunkSize, remaining);
-                ByteBuffer z = ByteBuffer.wrap(zeros, 0, chunk);
-                channel.write(z, pos);
-                remaining -= chunk;
-                pos += chunk;
-            }
-        } else {
-            long size = getFileSize();
-            long tailOffset = offset + length;
-            long tailLen = size - tailOffset;
-
-            long remaining = tailLen;
-            ByteBuffer buf = ByteBuffer.allocate(MOVE_BUFFER);
-
-            long src = tailOffset;
-            long dst = offset;
-
-            while (remaining > 0) {
-                int chunk = (int) Math.min(MOVE_BUFFER, remaining);
-                buf.clear();
-                buf.limit(chunk);
-                channel.read(buf, src);
-                buf.flip();
-                channel.write(buf, dst);
-
-                src += chunk;
-                dst += chunk;
-                remaining -= chunk;
-            }
-
-            file.setLength(size - length);
-        }
-
-        modified = true;
-    }
-
-    @Override
-    public void save() throws IOException {
-        if (modified) {
-            channel.force(true);
-            modified = false;
-        }
-    }
-
-    @Override
-    public void saveAs(String path) throws IOException {
-        throw new UnsupportedOperationException("saveAs not implemented");
-    }
-
-    @Override
-    public void close() throws IOException {
-        if (channel != null && channel.isOpen()) {
-            channel.close();
-        }
-        if (file != null) {
-            file.close();
-        }
-    }
-
-    @Override
     public boolean isModified() {
         return modified;
-    }
-
-    @Override
-    public void setByte(long position, byte value) throws IOException {
-        if (position < 0 || position >= getFileSize()) {
-            throw new IOException("Position out of bounds: " + position);
-        }
-
-        ByteBuffer buffer = ByteBuffer.allocate(1);
-        buffer.put(value);
-        buffer.flip();
-        channel.write(buffer, position);
-        modified = true;
     }
 }
