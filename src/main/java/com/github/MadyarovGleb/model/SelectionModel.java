@@ -13,26 +13,6 @@ public class SelectionModel {
         hasSelection = false;
     }
 
-    public long getCursorPosition() {
-        return cursorPosition;
-    }
-
-    public void setCursorPosition(long position) {
-        this.cursorPosition = position;
-        if (hasSelection) {
-            hasSelection = false;
-        }
-    }
-
-    public void setSelectionStart(long start) {
-        this.selectionStart = start;
-        this.hasSelection = true;
-    }
-
-    public void setSelectionEnd(long end) {
-        this.selectionEnd = end;
-    }
-
     public void setSelection(long start, long end) {
         this.selectionStart = start;
         this.selectionEnd = end;

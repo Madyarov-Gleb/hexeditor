@@ -13,6 +13,7 @@ import java.nio.file.Path;
 public class App extends JFrame {
     private HexEditorController controller;
     private HexEditorPanel editorPanel;
+    private JMenuItem saveMenuItem;
 
     public App() {
         initUI();
@@ -30,26 +31,8 @@ public class App extends JFrame {
     }
 
     private void confirmAndExit() {
-        if (controller != null && controller.hasUnsavedChanges()) {
-            int option = JOptionPane.showConfirmDialog(
-                    this,
-                    "Save changes before exiting?",
-                    "Exit",
-                    JOptionPane.YES_NO_CANCEL_OPTION
-            );
-
-            if (option == JOptionPane.YES_OPTION) {
-                try {
-                    controller.handleSave();
-                } catch (Exception ex) {
-                    JOptionPane.showMessageDialog(this,
-                            "Error saving file: " + ex.getMessage(),
-                            "Error", JOptionPane.ERROR_MESSAGE);
-                    return;
-                }
-            } else if (option == JOptionPane.CANCEL_OPTION) {
-                return;
-            }
+        if (!confirmUnsavedChanges("exit")) {
+            return;
         }
 
         if (controller != null) {
@@ -62,6 +45,31 @@ public class App extends JFrame {
         dispose();
     }
 
+    private boolean confirmUnsavedChanges(String action) {
+        if (controller != null && controller.hasUnsavedChanges()) {
+            int option = JOptionPane.showConfirmDialog(
+                    this,
+                    "Save changes before " + action + "?",
+                    "Unsaved Changes",
+                    JOptionPane.YES_NO_CANCEL_OPTION
+            );
+
+            if (option == JOptionPane.YES_OPTION) {
+                try {
+                    controller.handleSave();
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(this,
+                            "Error saving file: " + ex.getMessage(),
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                    return false;
+                }
+            } else if (option == JOptionPane.CANCEL_OPTION || option == JOptionPane.CLOSED_OPTION) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private void initUI() {
         editorPanel = new HexEditorPanel();
         add(editorPanel);
@@ -72,43 +80,38 @@ public class App extends JFrame {
         fileMenu.add(new JMenuItem(new AbstractAction("Open") {
             public void actionPerformed(ActionEvent e) { openFile(); }
         }));
-        fileMenu.add(new JMenuItem(new AbstractAction("Save") {
+
+        saveMenuItem = new JMenuItem(new AbstractAction("Save") {
             public void actionPerformed(ActionEvent e) { saveFile(); }
-        }));
+        });
+        saveMenuItem.setEnabled(false);
+        fileMenu.add(saveMenuItem);
+
         menuBar.add(fileMenu);
 
         JMenu editMenu = new JMenu("Edit");
-
         editMenu.add(new JMenuItem(new AbstractAction("Copy") {
             public void actionPerformed(ActionEvent e) { editorPanel.copySelection(); }
         }));
-
         editMenu.add(new JMenuItem(new AbstractAction("Cut (Zero Fill)") {
             public void actionPerformed(ActionEvent e) { editorPanel.cutSelection(true); }
         }));
-
         editMenu.add(new JMenuItem(new AbstractAction("Cut (Shift Left)") {
             public void actionPerformed(ActionEvent e) { editorPanel.cutSelection(false); }
         }));
-
         editMenu.add(new JMenuItem(new AbstractAction("Paste (Overwrite)") {
             public void actionPerformed(ActionEvent e) { editorPanel.pasteClipboard(true); }
         }));
-
         editMenu.add(new JMenuItem(new AbstractAction("Paste (Insert)") {
             public void actionPerformed(ActionEvent e) { editorPanel.pasteClipboard(false); }
         }));
-
         editMenu.addSeparator();
-
         editMenu.add(new JMenuItem(new AbstractAction("Insert Bytes") {
             public void actionPerformed(ActionEvent e) { editorPanel.insertBytesDialog(); }
         }));
-
         editMenu.add(new JMenuItem(new AbstractAction("Delete Selected Bytes") {
             public void actionPerformed(ActionEvent e) { editorPanel.showDeleteDialog(); }
         }));
-
         menuBar.add(editMenu);
 
         JMenu viewMenu = new JMenu("View");
@@ -143,12 +146,18 @@ public class App extends JFrame {
     }
 
     private void openFile() {
+        if (!confirmUnsavedChanges("opening a new file")) {
+            return;
+        }
+
         if (controller != null) {
             try {
                 controller.close();
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
+            controller = null;
+            updateSaveButtonState();
         }
 
         JFileChooser fc = new JFileChooser();
@@ -158,6 +167,7 @@ public class App extends JFrame {
                 controller = new HexEditorController(new ByteBufferFileModel(path));
                 editorPanel.setModel(controller.getFileModel(), controller.getSelectionModel());
                 setTitle("HEX Editor - " + path.getFileName());
+                updateSaveButtonState();
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(this, "Error opening file: " + ex.getMessage());
             }
@@ -173,6 +183,10 @@ public class App extends JFrame {
                 JOptionPane.showMessageDialog(this, "Error saving file: " + ex.getMessage());
             }
         }
+    }
+
+    private void updateSaveButtonState() {
+        saveMenuItem.setEnabled(controller != null);
     }
 
     public static void main(String[] args) {

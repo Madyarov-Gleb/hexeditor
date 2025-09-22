@@ -14,7 +14,7 @@ public class HexEditorController {
         this.selectionModel = new SelectionModel();
     }
 
-    public void handleSave() throws Exception {
+    public void handleSave() throws IOException {
         fileModel.save();
     }
 
@@ -30,10 +30,8 @@ public class HexEditorController {
         return fileModel != null && fileModel.isModified();
     }
 
-    public void close() throws Exception {
-        if (fileModel != null) {
-            fileModel.close();
-        }
+    public void close() throws IOException {
+        fileModel.close();
     }
 
     public byte getByteAt(long position) throws IOException {
