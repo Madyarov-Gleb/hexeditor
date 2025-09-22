@@ -1,7 +1,13 @@
 package com.github.MadyarovGleb.view;
 
-import javax.swing.*;
-import java.awt.*;
+import javax.swing.JDialog;
+import javax.swing.JTextField;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JButton;
+
+import java.awt.BorderLayout;
+import java.awt.Frame;
 
 public class SearchDialog extends JDialog {
     private JTextField patternField;

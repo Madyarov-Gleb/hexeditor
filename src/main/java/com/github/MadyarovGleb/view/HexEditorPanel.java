@@ -3,14 +3,34 @@ package com.github.MadyarovGleb.view;
 import com.github.MadyarovGleb.model.FileModel;
 import com.github.MadyarovGleb.model.SelectionModel;
 
-import javax.swing.*;
+import javax.swing.JPanel;
+import javax.swing.JTable;
+import javax.swing.JLabel;
+import javax.swing.JSpinner;
+import javax.swing.JTextField;
+import javax.swing.JButton;
+import javax.swing.JScrollPane;
+import javax.swing.JPopupMenu;
+import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
+import javax.swing.SpinnerNumberModel;
+import javax.swing.SwingWorker;
 import javax.swing.table.DefaultTableCellRenderer;
-import java.awt.*;
-import java.io.IOException;
+import javax.swing.SwingConstants;
+
+import java.awt.BorderLayout;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Frame;
+
 import java.nio.ByteBuffer;
-import java.util.HashSet;
+import java.io.IOException;
 import java.util.List;
 import java.util.Set;
+import java.util.HashSet;
 
 public class HexEditorPanel extends JPanel {
     private JTable hexTable;

@@ -1,9 +1,15 @@
 package com.github.MadyarovGleb.view;
 
-import javax.swing.*;
-import java.awt.*;
+import javax.swing.JDialog;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JButton;
+
+import java.awt.BorderLayout;
+import java.awt.GridLayout;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.awt.Frame;
 
 public class ValueInterpretationDialog extends JDialog {
     public ValueInterpretationDialog(Frame owner, byte[] data, long position) {

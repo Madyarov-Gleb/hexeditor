@@ -1,9 +1,12 @@
 package com.github.MadyarovGleb.view;
 
-import javax.swing.*;
-import java.awt.*;
+import javax.swing.JDialog;
+import javax.swing.JLabel;
+
+import java.awt.GridLayout;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.awt.Frame;
 
 public class ValueDisplayDialog extends JDialog {
     private JLabel byteValueLabel;
